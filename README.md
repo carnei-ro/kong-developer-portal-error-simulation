@@ -61,6 +61,7 @@ Open browser at the following links, then accept the certificate:
     - SAVE
 - At the `kong-portal`:
     - Access Type: `confidential`
+    - Implicit Flow Enabled: `ON`
     - Valid Redirect URIs:
         - `https://kong-portal-gui-127-0-0-1.nip.io/*`
         - `https://kong-portal-api-127-0-0-1.nip.io/*`

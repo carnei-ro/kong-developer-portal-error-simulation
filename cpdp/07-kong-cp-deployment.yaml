@@ -32,7 +32,6 @@ spec:
                 "client_secret": [
                   ""
                 ],
-                "session_cookie_domain": ".nip.io",
                 "leeway": 1000,
                 "authorization_endpoint": "https://keycloak-127-0-0-1.nip.io/auth/realms/master/protocol/openid-connect/auth",
                 "login_action": "redirect",
@@ -69,7 +68,14 @@ spec:
                 "login_redirect_mode": "query",
                 "redirect_uri": [
                   "https://kong-portal-api-127-0-0-1.nip.io/default/auth"
-                ]
+                ],
+                "session_storage":"cookie",
+                "session_cookie_name":"portal_session",
+                "session_cookie_domain":".nip.io",
+                "session_secret":"super-secret",
+                "session_cookie_secure":false,
+                "session_cookie_lifetime":31557600,
+                "session_cookie_samesite":"off"
               }
         - name: KONG_ADMIN_LISTEN
           value: 0.0.0.0:8001
