@@ -1,0 +1,225 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-ee-cp
+  namespace: kong-ee
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong-ee-cp
+  template:
+    metadata:
+      labels:
+        app: kong-ee-cp
+    spec:
+      containers:
+      - name: proxy
+        image: leandrocarneiro/kong:2.2.0.0-beta1-alpine
+        env:
+        - name: KONG_LICENSE_DATA
+          value: 
+        - name: KONG_ADMIN_GUI_SESSION_CONF
+          value: '{"secret":"kong_secret_for_session_plugin","storage":"kong","cookie_secure":false}'
+        - name: KONG_PASSWORD
+          value: KongSuperAdminPassword
+        - name: KONG_PG_PASSWORD
+          value: PostgresSecretPassword
+        - name: KONG_PORTAL_AUTH_CONF
+          value: |-
+              {
+                "client_secret": [
+                  ""
+                ],
+                "session_cookie_domain": ".nip.io",
+                "leeway": 1000,
+                "authorization_endpoint": "https://keycloak-127-0-0-1.nip.io/auth/realms/master/protocol/openid-connect/auth",
+                "login_action": "redirect",
+                "logout_redirect_uri": [
+                  "https://kong-portal-gui-127-0-0-1.nip.io"
+                ],
+                "consumer_claim": [
+                  "email"
+                ],
+                "ssl_verify": false,
+                "consumer_by": [
+                  "username",
+                  "custom_id",
+                  "id"
+                ],
+                "scopes": [
+                  "openid"
+                ],
+                "logout_query_arg": "logout",
+                "client_id": [
+                  "kong-portal"
+                ],
+                "forbidden_redirect_uri": [
+                  "https://kong-portal-gui-127-0-0-1.nip.io/unauthorized"
+                ],
+                "token_endpoint": "https://keycloak-127-0-0-1.nip.io/auth/realms/master/protocol/openid-connect/token",
+                "issuer": "https://keycloak-127-0-0-1.nip.io/auth/realms/master",
+                "logout_methods": [
+                  "GET"
+                ],
+                "login_redirect_uri": [
+                  "https://kong-portal-gui-127-0-0-1.nip.io/default/dashboard"
+                ],
+                "login_redirect_mode": "query",
+                "redirect_uri": [
+                  "https://kong-portal-api-127-0-0-1.nip.io/default/auth"
+                ]
+              }
+        - name: KONG_ADMIN_LISTEN
+          value: 0.0.0.0:8001
+        - name: KONG_STATUS_LISTEN
+          value: 0.0.0.0:8100
+        - name: KONG_DATABASE
+          value: postgres
+        - name: KONG_PG_HOST
+          value: postgres-control-plane.kong-ee.svc.cluster.local
+        - name: KONG_ADMIN_API_URI
+          value: https://kong-admin-127-0-0-1.nip.io
+        - name: KONG_ADMIN_GUI_URL
+          value: https://kong-admin-gui-127-0-0-1.nip.io
+        - name: KONG_ENFORCE_RBAC
+          value: "on"
+        - name: KONG_ADMIN_GUI_AUTH
+          value: basic-auth
+        # - name: KONG_ADMIN_GUI_AUTH
+        #   value: openid-connect
+        - name: KONG_NGINX_WORKER_PROCESSES
+          value: "1"
+        - name: KONG_LOG_LEVEL
+          value: "error"
+        - name: KONG_LUA_SSL_TRUSTED_CERTIFICATE
+          value: '/vault/secrets/crt,/etc/ssl/cert.pem'
+        - name: KONG_LUA_SSL_VERIFY_DEPTH
+          value: "3"
+        - name: KONG_ROLE
+          value: control_plane
+        - name: KONG_CLUSTER_CERT
+          value: /usr/local/kong/cluster.crt
+        - name: KONG_CLUSTER_CERT_KEY
+          value: /usr/local/kong/cluster.key
+        - name: KONG_PORTAL
+          value: 'on'
+        - name: KONG_PORTAL_GUI_LISTEN
+          value: 0.0.0.0:8003, 0.0.0.0:8446 ssl
+        - name: KONG_PORTAL_GUI_PROTOCOL
+          value: https
+        - name: KONG_PORTAL_GUI_HOST
+          value: kong-portal-gui-127-0-0-1.nip.io
+        - name: KONG_PORTAL_CORS_ORIGINS
+          value: https://kong-portal-gui-127-0-0-1.nip.io
+        - name: KONG_PORTAL_API_LISTEN
+          value: 0.0.0.0:8004, 0.0.0.0:8447 ssl
+        - name: KONG_PORTAL_API_URL
+          value: https://kong-portal-api-127-0-0-1.nip.io
+        - name: KONG_PORTAL_AUTH
+          value: openid-connect
+          # value: basic-auth
+        # - name: KONG_PORTAL_SESSION_CONF
+        #   value: '{"storage":"kong","cookie_name":"portal_session","cookie_domain":".nip.io","secret":"super-secret","cookie_secure":false,"cookie_lifetime":31557600,"cookie_samesite":"off"}'
+        - name: KONG_PORTAL_API_ERROR_LOG
+          value: /dev/stdout
+        - name: KONG_PORTAL_API_ACCESS_LOG
+          value: /dev/stdout
+        command: [ '/bin/sh' ]
+        args:
+          - -c
+          - |
+              ENTRYPOINT_RUN_MIGRATIONS=${ENTRYPOINT_RUN_MIGRATIONS:-true}
+              ENTRYPOINT_CERT_TASKS=${ENTRYPOINT_CERT_TASKS:-true}
+
+              if [ -d /vault/secrets ]; then
+                  if [ "${ENTRYPOINT_CERT_TASKS}" == "true" ]; then
+                      if [ $(id -u) != 0 ]; then echo "You must be root to manage certificates"; exit 1; fi
+                      cp -v /vault/secrets/crt /usr/local/kong/cluster.crt
+                      cp -v /vault/secrets/key /usr/local/kong/cluster.key
+                  fi
+              fi
+
+              if [ "${ENTRYPOINT_RUN_MIGRATIONS}" == "true" ]; then
+                  /usr/local/bin/kong migrations bootstrap
+                  /usr/local/bin/kong migrations finish
+                  /usr/local/bin/kong migrations up
+              fi
+              /docker-entrypoint.sh kong docker-start --vv
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - kong quit
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /status
+            port: 8100
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /status
+            port: 8100
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 8001
+          name: admin
+          protocol: TCP
+        - containerPort: 8002
+          name: admin-gui
+          protocol: TCP
+        - containerPort: 8005
+          name: control-plane
+          protocol: TCP
+        - containerPort: 8006
+          name: telemetry
+          protocol: TCP
+        - containerPort: 8100
+          name: metrics
+          protocol: TCP
+        - containerPort: 8003
+          name: portal-gui
+          protocol: TCP
+        - containerPort: 8004
+          name: portal-api
+          protocol: TCP
+        - containerPort: 8446
+          name: portal-gui-ssl
+          protocol: TCP
+        - containerPort: 8447
+          name: portal-api-ssl
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 384Mi
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: certs
+            mountPath: /vault/secrets/crt
+            subPath: crt
+          - name: certs
+            mountPath: /vault/secrets/key
+            subPath: key
+      volumes:
+        - name: certs
+          configMap:
+            defaultMode: 0644
+            name: certs

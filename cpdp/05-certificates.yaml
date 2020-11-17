@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: certs
+  namespace: kong-ee
+data:
+  crt: |-
+    -----BEGIN CERTIFICATE-----
+    MIIBWTCB3wIBADAKBggqhkjOPQQDAjAaMRgwFgYDVQQDDA9rb25nX2NsdXN0ZXJp
+    bmcwHhcNMjAwODI3MTg1OTU0WhcNMjMwODI3MTg1OTU0WjAaMRgwFgYDVQQDDA9r
+    b25nX2NsdXN0ZXJpbmcwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAQxinH6VT1vxKBf
+    nb9u3SCOR5uEvHOG73jL892uVasutuwWmeJIH7dPCy5fHo1ZKVYyJP6dk6Tatw2P
+    O2DIU+RevNC1w5LQXsNJmTcErsD4gLVEcqGsXeLrBjJy564fdbMwCgYIKoZIzj0E
+    AwIDaQAwZgIxAPNlYd9CNfnPOLlewTBZhK3Bs0ahxa3WZvKxsYOAfwzsX4n/DDiv
+    gzuGNfwZHTb3qwIxAM63RaNMM9Ox9b3fVyG2GyRZrxH9K8fxytFsIRfBS7Aofcno
+    wr/k7xlIKXAllqgg5A==
+    -----END CERTIFICATE-----
+  key: |-
+    -----BEGIN PRIVATE KEY-----
+    MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDDuPMrmh5xEAlp2rK/B
+    HIpWr3WcgEUKVtCmZqgU595VKj4DLiWYU6YyopI4oGUruTyhZANiAAQxinH6VT1v
+    xKBfnb9u3SCOR5uEvHOG73jL892uVasutuwWmeJIH7dPCy5fHo1ZKVYyJP6dk6Ta
+    tw2PO2DIU+RevNC1w5LQXsNJmTcErsD4gLVEcqGsXeLrBjJy564fdbM=
+    -----END PRIVATE KEY-----

@@ -1,0 +1,49 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kong-ee-cp
+  name: kong-ee-cp-internal
+  namespace: kong-ee
+spec:
+  ports:
+  - name: admin
+    port: 8001
+    protocol: TCP
+    targetPort: 8001
+  - name: admin-gui
+    port: 8002
+    protocol: TCP
+    targetPort: 8002
+  - name: control-plane
+    port: 8005
+    protocol: TCP
+    targetPort: 8005
+  - name: telemetry
+    port: 8006
+    protocol: TCP
+    targetPort: 8006
+  - name: metrics
+    port: 8100
+    protocol: TCP
+    targetPort: 8100
+  - name: portal-gui
+    port: 8003
+    protocol: TCP
+    targetPort: 8003
+  - name: portal-api
+    port: 8004
+    protocol: TCP
+    targetPort: 8004
+  - name: portal-gui-ssl
+    port: 8446
+    protocol: TCP
+    targetPort: 8446
+  - name: portal-api-ssl
+    port: 8447
+    protocol: TCP
+    targetPort: 8447
+  selector:
+    app: kong-ee-cp
+  type: ClusterIP

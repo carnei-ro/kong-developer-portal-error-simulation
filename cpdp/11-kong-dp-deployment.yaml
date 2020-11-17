@@ -1,0 +1,131 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-ee-dp
+  namespace: kong-ee
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong-ee-dp
+  template:
+    metadata:
+      labels:
+        app: kong-ee-dp
+    spec:
+      containers:
+      - name: proxy
+        image: leandrocarneiro/kong:2.2.0.0-beta1-alpine
+        env:
+        - name: KONG_LICENSE_DATA
+          value: 
+        - name: KONG_PROXY_LISTEN
+          value: 0.0.0.0:8000, 0.0.0.0:8443 ssl http2
+        - name: KONG_STATUS_LISTEN
+          value: 0.0.0.0:8100
+        - name: KONG_NGINX_WORKER_PROCESSES
+          value: "1"
+        - name: KONG_LOG_LEVEL
+          value: "debug"
+        - name: KONG_LUA_SSL_TRUSTED_CERTIFICATE
+          value: '/vault/secrets/crt,/etc/ssl/cert.pem'
+        - name: KONG_LUA_SSL_VERIFY_DEPTH
+          value: "3"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_PROXY_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ROLE
+          value: data_plane
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_CLUSTER_CONTROL_PLANE
+          value: kong-ee-cp-internal.kong-ee.svc.cluster.local:8005
+        - name: KONG_CLUSTER_TELEMETRY_ENDPOINT
+          value: kong-ee-cp-internal.kong-ee.svc.cluster.local:8006
+        - name: KONG_CLUSTER_CERT
+          value: /usr/local/kong/cluster.crt
+        - name: KONG_CLUSTER_CERT_KEY
+          value: /usr/local/kong/cluster.key
+        - name: ENTRYPOINT_RUN_MIGRATIONS
+          value: "false"
+        command: [ '/bin/sh' ]
+        args:
+          - -c
+          - |
+              ENTRYPOINT_RUN_MIGRATIONS=${ENTRYPOINT_RUN_MIGRATIONS:-true}
+              ENTRYPOINT_CERT_TASKS=${ENTRYPOINT_CERT_TASKS:-true}
+
+              if [ -d /vault/secrets ]; then
+                  if [ "${ENTRYPOINT_CERT_TASKS}" == "true" ]; then
+                      if [ $(id -u) != 0 ]; then echo "You must be root to manage certificates"; exit 1; fi
+                      cp -v /vault/secrets/crt /usr/local/kong/cluster.crt
+                      cp -v /vault/secrets/key /usr/local/kong/cluster.key
+                  fi
+              fi
+
+              if [ "${ENTRYPOINT_RUN_MIGRATIONS}" == "true" ]; then
+                  /usr/local/bin/kong migrations bootstrap
+                  /usr/local/bin/kong migrations finish
+                  /usr/local/bin/kong migrations up
+              fi
+              /docker-entrypoint.sh kong docker-start --vv
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - kong quit
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /status
+            port: 8100
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /status
+            port: 8100
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        ports:
+        - containerPort: 8000
+          name: proxy
+          protocol: TCP
+        - containerPort: 8443
+          name: proxy-ssl
+          protocol: TCP
+        - containerPort: 8100
+          name: metrics
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: certs
+            mountPath: /vault/secrets/crt
+            subPath: crt
+          - name: certs
+            mountPath: /vault/secrets/key
+            subPath: key
+      volumes:
+        - name: certs
+          configMap:
+            defaultMode: 0644
+            name: certs

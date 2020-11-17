@@ -1,0 +1,37 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-control-plane
+  namespace: kong-ee
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-control-plane
+  template:
+    metadata:
+      labels:
+        app: postgres-control-plane
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:10
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: kong
+            - name: POSTGRES_DB
+              value: kong
+            - name: POSTGRES_PASSWORD
+              value: PostgresSecretPassword
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              subPath: postgres
+              name: postgres
+      volumes:
+        - name: postgres
+          persistentVolumeClaim:
+            claimName: postgres-control-plane
